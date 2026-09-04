@@ -24,11 +24,16 @@
       box-sizing: border-box;
     }
 
+    html, body {
+      height: 100%;
+    }
+
     body {
       margin: 0;
-      min-height: 100vh;
+      min-height: 100%;
       background: var(--bg);
       color: var(--text);
+      overflow: hidden;
     }
 
     button, input, select {
@@ -85,15 +90,18 @@
     }
 
     .app {
-      min-height: 100vh;
+      height: 100vh;
+      height: 100dvh;
       display: grid;
       grid-template-columns: minmax(340px, 1.15fr) minmax(330px, .85fr) 300px;
       gap: 14px;
       padding: 14px;
+      overflow: hidden;
     }
 
     .panel {
       min-width: 0;
+      min-height: 0;
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -143,6 +151,7 @@
     .stage {
       flex: 1;
       min-height: 0;
+      overflow: hidden;
       display: grid;
       place-items: center;
       padding: 12px;
@@ -247,6 +256,8 @@
     }
 
     .controls {
+      flex: 1;
+      min-height: 0;
       padding: 12px;
       overflow: auto;
       display: grid;
@@ -344,8 +355,15 @@
     }
 
     @media (max-width: 1040px) {
+      body {
+        overflow: auto;
+      }
+
       .app {
+        height: auto;
+        min-height: 100vh;
         grid-template-columns: 1fr;
+        overflow: visible;
       }
 
       .source-wrap {
