@@ -1,0 +1,1130 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LCD Pixel Preview</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101316;
+      --panel: #171c21;
+      --panel-2: #20262d;
+      --line: #343d46;
+      --text: #eef2f3;
+      --muted: #9ba8b3;
+      --accent: #75d4c2;
+      --accent-2: #f1c65b;
+      --danger: #ff7d78;
+      --shadow: 0 18px 48px rgba(0, 0, 0, .35);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    button, input, select {
+      font: inherit;
+    }
+
+    button, .file-button {
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      border-radius: 8px;
+      min-height: 38px;
+      padding: 0 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: border-color .15s ease, background .15s ease, transform .15s ease;
+      white-space: nowrap;
+    }
+
+    button:hover, .file-button:hover {
+      border-color: var(--accent);
+      background: #253039;
+    }
+
+    button:active, .file-button:active {
+      transform: translateY(1px);
+    }
+
+    button.primary {
+      border-color: rgba(117, 212, 194, .65);
+      background: #173d3a;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    select, input[type="number"], input[type="text"] {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #0f1418;
+      color: var(--text);
+      border-radius: 8px;
+      min-height: 34px;
+      padding: 0 10px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(340px, 1.15fr) minmax(330px, .85fr) 300px;
+      gap: 14px;
+      padding: 14px;
+    }
+
+    .panel {
+      min-width: 0;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel header {
+      min-height: 54px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .title {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .title h1, .title h2 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .title span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.2;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .stage {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      place-items: center;
+      padding: 12px;
+      background:
+        linear-gradient(45deg, rgba(255,255,255,.025) 25%, transparent 25% 75%, rgba(255,255,255,.025) 75%),
+        linear-gradient(45deg, rgba(255,255,255,.025) 25%, transparent 25% 75%, rgba(255,255,255,.025) 75%);
+      background-position: 0 0, 10px 10px;
+      background-size: 20px 20px;
+    }
+
+    .source-wrap {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 360px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    #sourceCanvas {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #080b0d;
+      border-radius: 6px;
+    }
+
+    #lcdCanvas {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      background: #000;
+      box-shadow: 0 0 0 1px #000, 0 12px 36px rgba(0,0,0,.45);
+      max-width: none;
+      max-height: none;
+    }
+
+    .selection {
+      position: absolute;
+      border: 2px solid var(--accent);
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, .48), inset 0 0 0 1px rgba(0, 0, 0, .75);
+      cursor: move;
+      touch-action: none;
+    }
+
+    .selection::before {
+      content: attr(data-size);
+      position: absolute;
+      left: 6px;
+      top: 5px;
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: rgba(0,0,0,.72);
+      color: var(--accent);
+      font-size: 11px;
+      line-height: 1.2;
+    }
+
+    .handle {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #051311;
+      background: var(--accent);
+      border-radius: 50%;
+    }
+
+    .handle.nw { left: -8px; top: -8px; cursor: nwse-resize; }
+    .handle.ne { right: -8px; top: -8px; cursor: nesw-resize; }
+    .handle.sw { left: -8px; bottom: -8px; cursor: nesw-resize; }
+    .handle.se { right: -8px; bottom: -8px; cursor: nwse-resize; }
+
+    .drop-hint {
+      position: absolute;
+      inset: auto 16px 16px 16px;
+      padding: 9px 10px;
+      color: var(--muted);
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      background: rgba(16, 19, 22, .85);
+      text-align: center;
+      font-size: 12px;
+      pointer-events: none;
+    }
+
+    .status {
+      border-top: 1px solid var(--line);
+      min-height: 34px;
+      padding: 8px 12px;
+      color: var(--muted);
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .controls {
+      padding: 12px;
+      overflow: auto;
+      display: grid;
+      gap: 14px;
+    }
+
+    .group {
+      display: grid;
+      gap: 9px;
+    }
+
+    .group h3 {
+      margin: 0;
+      color: var(--accent-2);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field label {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .toggle input {
+      width: 19px;
+      height: 19px;
+      accent-color: var(--accent);
+    }
+
+    .grid-two {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .readout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      background: #11171b;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 14px;
+      line-height: 1.2;
+    }
+
+    .metric span {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .hidden-video {
+      position: fixed;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+      left: -10px;
+      top: -10px;
+    }
+
+    .small {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    @media (max-width: 1040px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .source-wrap {
+        min-height: 320px;
+      }
+
+      .panel.preview .stage {
+        min-height: 440px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="panel">
+      <header>
+        <div class="title">
+          <h1>Source</h1>
+          <span>画像、動画、または画面共有から切り出し</span>
+        </div>
+        <div class="toolbar">
+          <label class="file-button" for="fileInput">画像を開く</label>
+          <input id="fileInput" type="file" accept="image/*,video/*">
+          <button id="screenButton" class="primary" type="button">画面共有</button>
+        </div>
+      </header>
+      <div class="stage">
+        <div id="sourceWrap" class="source-wrap">
+          <canvas id="sourceCanvas"></canvas>
+          <div id="selection" class="selection">
+            <i class="handle nw" data-handle="nw"></i>
+            <i class="handle ne" data-handle="ne"></i>
+            <i class="handle sw" data-handle="sw"></i>
+            <i class="handle se" data-handle="se"></i>
+          </div>
+          <div id="dropHint" class="drop-hint">ここに画像/動画をドロップできます。画面共有後は枠を動かしてLCD範囲を選択。</div>
+        </div>
+      </div>
+      <div class="status">
+        <span id="sourceStatus">入力待ち</span>
+        <span id="cropStatus">crop: -</span>
+      </div>
+    </section>
+
+    <section class="panel preview">
+      <header>
+        <div class="title">
+          <h2>LCD Preview</h2>
+          <span id="lcdSizeLabel">160 x 128 pixels</span>
+        </div>
+        <div class="toolbar">
+          <button id="downloadPng" type="button">PNG保存</button>
+          <button id="copyC" type="button">RGB565 C配列</button>
+        </div>
+      </header>
+      <div class="stage">
+        <canvas id="lcdCanvas" width="160" height="128"></canvas>
+      </div>
+      <div class="status">
+        <span id="lcdStatus">0 fps</span>
+        <span id="modeStatus">RGB565</span>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <header>
+        <div class="title">
+          <h2>Controls</h2>
+          <span>LCDに寄せる調整</span>
+        </div>
+      </header>
+      <div class="controls">
+        <div class="group">
+          <h3>LCDサイズ</h3>
+          <div class="grid-two">
+            <div class="field">
+              <label for="lcdW"><span>幅</span></label>
+              <input id="lcdW" type="number" min="8" max="640" value="160">
+            </div>
+            <div class="field">
+              <label for="lcdH"><span>高さ</span></label>
+              <input id="lcdH" type="number" min="8" max="480" value="128">
+            </div>
+          </div>
+        </div>
+
+        <div class="group">
+          <h3>表示</h3>
+          <div class="field">
+            <label for="zoomRange"><span>拡大率</span><output id="zoomOut">5x</output></label>
+            <input id="zoomRange" type="range" min="2" max="8" step="1" value="5">
+          </div>
+          <div class="field">
+            <label for="pixelAspect"><span>横ドット比</span><output id="pixelAspectOut">1.00</output></label>
+            <input id="pixelAspect" type="range" min="75" max="130" step="1" value="100">
+          </div>
+          <label class="toggle">
+            <span>ドット格子を表示</span>
+            <input id="gridToggle" type="checkbox" checked>
+          </label>
+          <label class="toggle">
+            <span>ライブ更新</span>
+            <input id="liveToggle" type="checkbox" checked>
+          </label>
+        </div>
+
+        <div class="group">
+          <h3>変換</h3>
+          <div class="field">
+            <label for="fitMode"><span>スケール</span></label>
+            <select id="fitMode">
+              <option value="crop">選択範囲をLCDへ</option>
+              <option value="contain">全体を収める</option>
+              <option value="cover">画面いっぱい</option>
+              <option value="stretch">引き伸ばし</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="colorMode"><span>色形式</span></label>
+            <select id="colorMode">
+              <option value="rgb565" selected>RGB565</option>
+              <option value="rgb888">RGB888</option>
+              <option value="gray4">4bit Gray</option>
+              <option value="mono">1bit Mono</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ditherMode"><span>ディザ</span></label>
+            <select id="ditherMode">
+              <option value="none">なし</option>
+              <option value="bayer" selected>Bayer 4x4</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="group">
+          <h3>画質</h3>
+          <div class="field">
+            <label for="brightness"><span>明るさ</span><output id="brightnessOut">0</output></label>
+            <input id="brightness" type="range" min="-80" max="80" value="0">
+          </div>
+          <div class="field">
+            <label for="contrast"><span>コントラスト</span><output id="contrastOut">0</output></label>
+            <input id="contrast" type="range" min="-80" max="80" value="0">
+          </div>
+          <div class="field">
+            <label for="saturation"><span>彩度</span><output id="saturationOut">0</output></label>
+            <input id="saturation" type="range" min="-100" max="100" value="0">
+          </div>
+          <div class="field">
+            <label for="gamma"><span>ガンマ</span><output id="gammaOut">1.00</output></label>
+            <input id="gamma" type="range" min="60" max="180" value="100">
+          </div>
+        </div>
+
+        <div class="group">
+          <h3>範囲</h3>
+          <div class="grid-two">
+            <div class="field">
+              <label for="cropX"><span>X</span></label>
+              <input id="cropX" type="number" min="0" value="0">
+            </div>
+            <div class="field">
+              <label for="cropY"><span>Y</span></label>
+              <input id="cropY" type="number" min="0" value="0">
+            </div>
+          </div>
+          <div class="grid-two">
+            <div class="field">
+              <label for="cropW"><span>幅</span></label>
+              <input id="cropW" type="number" min="16" value="160">
+            </div>
+            <div class="field">
+              <label for="cropH"><span>高さ</span></label>
+              <input id="cropH" type="number" min="13" value="128">
+            </div>
+          </div>
+        </div>
+
+        <div class="readout">
+          <div class="metric">
+            <strong id="inputSize">-</strong>
+            <span>入力サイズ</span>
+          </div>
+          <div class="metric">
+            <strong id="pixelCount">20,480</strong>
+            <span>LCDピクセル</span>
+          </div>
+        </div>
+        <p class="small">画面共有はブラウザの許可ダイアログで対象を選びます。共有された映像の中で枠を動かすと、その部分だけが指定したLCDサイズへ変換されます。</p>
+      </div>
+    </aside>
+  </main>
+
+  <video id="sourceVideo" class="hidden-video" autoplay playsinline muted></video>
+
+  <script>
+    const DEFAULT_LCD_W = 160;
+    const DEFAULT_LCD_H = 128;
+    let lcd = { w: DEFAULT_LCD_W, h: DEFAULT_LCD_H };
+
+    const els = {
+      sourceWrap: document.getElementById('sourceWrap'),
+      sourceCanvas: document.getElementById('sourceCanvas'),
+      lcdCanvas: document.getElementById('lcdCanvas'),
+      selection: document.getElementById('selection'),
+      fileInput: document.getElementById('fileInput'),
+      screenButton: document.getElementById('screenButton'),
+      sourceVideo: document.getElementById('sourceVideo'),
+      sourceStatus: document.getElementById('sourceStatus'),
+      cropStatus: document.getElementById('cropStatus'),
+      lcdStatus: document.getElementById('lcdStatus'),
+      modeStatus: document.getElementById('modeStatus'),
+      lcdSizeLabel: document.getElementById('lcdSizeLabel'),
+      inputSize: document.getElementById('inputSize'),
+      pixelCount: document.getElementById('pixelCount'),
+      downloadPng: document.getElementById('downloadPng'),
+      copyC: document.getElementById('copyC'),
+      dropHint: document.getElementById('dropHint'),
+      zoomRange: document.getElementById('zoomRange'),
+      zoomOut: document.getElementById('zoomOut'),
+      pixelAspect: document.getElementById('pixelAspect'),
+      pixelAspectOut: document.getElementById('pixelAspectOut'),
+      lcdW: document.getElementById('lcdW'),
+      lcdH: document.getElementById('lcdH'),
+      gridToggle: document.getElementById('gridToggle'),
+      liveToggle: document.getElementById('liveToggle'),
+      fitMode: document.getElementById('fitMode'),
+      colorMode: document.getElementById('colorMode'),
+      ditherMode: document.getElementById('ditherMode'),
+      brightness: document.getElementById('brightness'),
+      contrast: document.getElementById('contrast'),
+      saturation: document.getElementById('saturation'),
+      gamma: document.getElementById('gamma'),
+      brightnessOut: document.getElementById('brightnessOut'),
+      contrastOut: document.getElementById('contrastOut'),
+      saturationOut: document.getElementById('saturationOut'),
+      gammaOut: document.getElementById('gammaOut'),
+      cropX: document.getElementById('cropX'),
+      cropY: document.getElementById('cropY'),
+      cropW: document.getElementById('cropW'),
+      cropH: document.getElementById('cropH')
+    };
+
+    const sourceCtx = els.sourceCanvas.getContext('2d', { willReadFrequently: true });
+    const lcdCtx = els.lcdCanvas.getContext('2d', { willReadFrequently: true });
+    const workCanvas = document.createElement('canvas');
+    const workCtx = workCanvas.getContext('2d', { willReadFrequently: true });
+
+    let source = null;
+    let sourceType = 'none';
+    let crop = { x: 0, y: 0, w: lcd.w, h: lcd.h };
+    let sourceRect = { x: 0, y: 0, w: 1, h: 1, scale: 1 };
+    let drag = null;
+    let frameCount = 0;
+    let lastFpsAt = performance.now();
+    let lastFrameImage = null;
+
+    const bayer4 = [
+      0, 8, 2, 10,
+      12, 4, 14, 6,
+      3, 11, 1, 9,
+      15, 7, 13, 5
+    ];
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function getAspect() {
+      return lcd.w / lcd.h;
+    }
+
+    function getSourceSize() {
+      if (!source) return { w: 0, h: 0 };
+      if (sourceType === 'video' || sourceType === 'screen') {
+        return { w: source.videoWidth || 0, h: source.videoHeight || 0 };
+      }
+      return { w: source.naturalWidth || source.width || 0, h: source.naturalHeight || source.height || 0 };
+    }
+
+    function fitSourceCanvas() {
+      const rect = els.sourceWrap.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const cssW = Math.max(1, Math.floor(rect.width));
+      const cssH = Math.max(1, Math.floor(rect.height));
+      els.sourceCanvas.width = Math.floor(cssW * dpr);
+      els.sourceCanvas.height = Math.floor(cssH * dpr);
+      sourceCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function drawSourcePreview() {
+      const canvasRect = els.sourceCanvas.getBoundingClientRect();
+      sourceCtx.clearRect(0, 0, canvasRect.width, canvasRect.height);
+      sourceCtx.fillStyle = '#080b0d';
+      sourceCtx.fillRect(0, 0, canvasRect.width, canvasRect.height);
+
+      const size = getSourceSize();
+      if (!source || !size.w || !size.h) {
+        sourceRect = { x: 0, y: 0, w: canvasRect.width, h: canvasRect.height, scale: 1 };
+        return;
+      }
+
+      const scale = Math.min(canvasRect.width / size.w, canvasRect.height / size.h);
+      const w = size.w * scale;
+      const h = size.h * scale;
+      const x = (canvasRect.width - w) / 2;
+      const y = (canvasRect.height - h) / 2;
+      sourceCtx.imageSmoothingEnabled = true;
+      sourceCtx.drawImage(source, x, y, w, h);
+      sourceRect = { x, y, w, h, scale };
+    }
+
+    function syncSelectionFromCrop() {
+      const left = sourceRect.x + crop.x * sourceRect.scale;
+      const top = sourceRect.y + crop.y * sourceRect.scale;
+      els.selection.style.left = `${left}px`;
+      els.selection.style.top = `${top}px`;
+      els.selection.style.width = `${crop.w * sourceRect.scale}px`;
+      els.selection.style.height = `${crop.h * sourceRect.scale}px`;
+      updateCropInputs();
+    }
+
+    function syncCropFromSelection() {
+      const size = getSourceSize();
+      const left = parseFloat(els.selection.style.left || 0);
+      const top = parseFloat(els.selection.style.top || 0);
+      const w = parseFloat(els.selection.style.width || lcd.w);
+      const h = parseFloat(els.selection.style.height || lcd.h);
+      crop.x = clamp(Math.round((left - sourceRect.x) / sourceRect.scale), 0, Math.max(0, size.w - 1));
+      crop.y = clamp(Math.round((top - sourceRect.y) / sourceRect.scale), 0, Math.max(0, size.h - 1));
+      crop.w = clamp(Math.round(w / sourceRect.scale), 16, Math.max(16, size.w - crop.x));
+      crop.h = clamp(Math.round(h / sourceRect.scale), 13, Math.max(13, size.h - crop.y));
+      updateCropInputs();
+    }
+
+    function normalizeCrop() {
+      const size = getSourceSize();
+      if (!size.w || !size.h) return;
+      const aspect = getAspect();
+      crop.w = clamp(crop.w, 16, size.w);
+      crop.h = Math.round(crop.w / aspect);
+      if (crop.h > size.h) {
+        crop.h = size.h;
+        crop.w = Math.round(crop.h * aspect);
+      }
+      crop.x = clamp(crop.x, 0, Math.max(0, size.w - crop.w));
+      crop.y = clamp(crop.y, 0, Math.max(0, size.h - crop.h));
+      updateCropInputs();
+      syncSelectionFromCrop();
+    }
+
+    function updateCropInputs() {
+      els.cropX.value = crop.x;
+      els.cropY.value = crop.y;
+      els.cropW.value = crop.w;
+      els.cropH.value = crop.h;
+      els.cropStatus.textContent = `crop: ${crop.x}, ${crop.y}, ${crop.w} x ${crop.h}`;
+    }
+
+    function initCropToCenter() {
+      const size = getSourceSize();
+      if (!size.w || !size.h) return;
+      const aspect = getAspect();
+      let w = size.w;
+      let h = Math.round(w / aspect);
+      if (h > size.h) {
+        h = size.h;
+        w = Math.round(h * aspect);
+      }
+      crop = {
+        x: Math.max(0, Math.round((size.w - w) / 2)),
+        y: Math.max(0, Math.round((size.h - h) / 2)),
+        w,
+        h
+      };
+      updateCropInputs();
+    }
+
+    function updateOutputs() {
+      els.zoomOut.value = `${els.zoomRange.value}x`;
+      els.pixelAspectOut.value = (Number(els.pixelAspect.value) / 100).toFixed(2);
+      els.brightnessOut.value = els.brightness.value;
+      els.contrastOut.value = els.contrast.value;
+      els.saturationOut.value = els.saturation.value;
+      els.gammaOut.value = (Number(els.gamma.value) / 100).toFixed(2);
+      els.modeStatus.textContent = els.colorMode.options[els.colorMode.selectedIndex].textContent;
+      els.lcdSizeLabel.textContent = `${lcd.w} x ${lcd.h} pixels`;
+      els.selection.dataset.size = `${lcd.w}:${lcd.h}`;
+      els.pixelCount.textContent = (lcd.w * lcd.h).toLocaleString();
+      els.lcdCanvas.width = lcd.w;
+      els.lcdCanvas.height = lcd.h;
+      updateLcdCanvasSize();
+    }
+
+    function applyLcdSize() {
+      const nextW = clamp(Math.round(Number(els.lcdW.value) || DEFAULT_LCD_W), 8, 640);
+      const nextH = clamp(Math.round(Number(els.lcdH.value) || DEFAULT_LCD_H), 8, 480);
+      const changed = nextW !== lcd.w || nextH !== lcd.h;
+      lcd = { w: nextW, h: nextH };
+      els.lcdW.value = lcd.w;
+      els.lcdH.value = lcd.h;
+      lastFrameImage = null;
+      updateOutputs();
+      if (changed) {
+        normalizeCrop();
+      }
+      renderLcd();
+    }
+
+    function updateLcdCanvasSize() {
+      const zoom = Number(els.zoomRange.value);
+      const pixelAspect = Number(els.pixelAspect.value) / 100;
+      const targetW = lcd.w * zoom * pixelAspect;
+      const targetH = lcd.h * zoom;
+      const displayAspect = targetW / targetH;
+      const stage = els.lcdCanvas.closest('.stage').getBoundingClientRect();
+      const pad = 24;
+      const maxW = Math.max(80, stage.width - pad);
+      const maxH = Math.max(64, stage.height - pad);
+      const scale = Math.min(1, maxW / targetW, maxH / targetH);
+      const cssW = Math.floor(targetW * scale);
+      const cssH = Math.floor(cssW / displayAspect);
+      els.lcdCanvas.style.width = `${cssW}px`;
+      els.lcdCanvas.style.height = `${cssH}px`;
+    }
+
+    function adjustedPixel(r, g, b, x, y) {
+      const brightness = Number(els.brightness.value);
+      const contrast = Number(els.contrast.value);
+      const saturation = Number(els.saturation.value) / 100;
+      const gamma = Number(els.gamma.value) / 100;
+      const contrastFactor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+
+      r = clamp(contrastFactor * (r - 128) + 128 + brightness, 0, 255);
+      g = clamp(contrastFactor * (g - 128) + 128 + brightness, 0, 255);
+      b = clamp(contrastFactor * (b - 128) + 128 + brightness, 0, 255);
+
+      const luma = r * .299 + g * .587 + b * .114;
+      r = clamp(luma + (r - luma) * (1 + saturation), 0, 255);
+      g = clamp(luma + (g - luma) * (1 + saturation), 0, 255);
+      b = clamp(luma + (b - luma) * (1 + saturation), 0, 255);
+
+      r = 255 * Math.pow(r / 255, 1 / gamma);
+      g = 255 * Math.pow(g / 255, 1 / gamma);
+      b = 255 * Math.pow(b / 255, 1 / gamma);
+
+      if (els.ditherMode.value === 'bayer') {
+        const threshold = (bayer4[(x & 3) + ((y & 3) << 2)] - 7.5) * 3.1;
+        r = clamp(r + threshold, 0, 255);
+        g = clamp(g + threshold, 0, 255);
+        b = clamp(b + threshold, 0, 255);
+      }
+
+      const mode = els.colorMode.value;
+      if (mode === 'rgb565') {
+        r = Math.round(r / 255 * 31) * 255 / 31;
+        g = Math.round(g / 255 * 63) * 255 / 63;
+        b = Math.round(b / 255 * 31) * 255 / 31;
+      } else if (mode === 'gray4') {
+        const gray = Math.round((r * .299 + g * .587 + b * .114) / 255 * 15) * 255 / 15;
+        r = g = b = gray;
+      } else if (mode === 'mono') {
+        const gray = r * .299 + g * .587 + b * .114;
+        const bit = gray >= 128 ? 255 : 0;
+        r = g = b = bit;
+      }
+
+      return [r, g, b];
+    }
+
+    function renderLcd() {
+      const size = getSourceSize();
+      if (!source || !size.w || !size.h) {
+        lcdCtx.fillStyle = '#000';
+        lcdCtx.fillRect(0, 0, lcd.w, lcd.h);
+        return;
+      }
+
+      workCanvas.width = lcd.w;
+      workCanvas.height = lcd.h;
+      workCtx.imageSmoothingEnabled = true;
+      workCtx.fillStyle = '#000';
+      workCtx.fillRect(0, 0, lcd.w, lcd.h);
+
+      const mode = els.fitMode.value;
+      if (mode === 'crop') {
+        workCtx.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, lcd.w, lcd.h);
+      } else {
+        let sx = 0;
+        let sy = 0;
+        let sw = size.w;
+        let sh = size.h;
+        let dx = 0;
+        let dy = 0;
+        let dw = lcd.w;
+        let dh = lcd.h;
+
+        if (mode === 'contain') {
+          const scale = Math.min(lcd.w / size.w, lcd.h / size.h);
+          dw = Math.round(size.w * scale);
+          dh = Math.round(size.h * scale);
+          dx = Math.round((lcd.w - dw) / 2);
+          dy = Math.round((lcd.h - dh) / 2);
+        } else if (mode === 'cover') {
+          const sourceAspect = size.w / size.h;
+          const aspect = getAspect();
+          if (sourceAspect > aspect) {
+            sw = Math.round(size.h * aspect);
+            sx = Math.round((size.w - sw) / 2);
+          } else {
+            sh = Math.round(size.w / aspect);
+            sy = Math.round((size.h - sh) / 2);
+          }
+        }
+
+        workCtx.drawImage(source, sx, sy, sw, sh, dx, dy, dw, dh);
+      }
+
+      const image = workCtx.getImageData(0, 0, lcd.w, lcd.h);
+      const data = image.data;
+      for (let y = 0; y < lcd.h; y++) {
+        for (let x = 0; x < lcd.w; x++) {
+          const i = (y * lcd.w + x) * 4;
+          const [r, g, b] = adjustedPixel(data[i], data[i + 1], data[i + 2], x, y);
+          data[i] = r;
+          data[i + 1] = g;
+          data[i + 2] = b;
+          data[i + 3] = 255;
+        }
+      }
+      lcdCtx.putImageData(image, 0, 0);
+      lastFrameImage = image;
+
+      if (els.gridToggle.checked && Number(els.zoomRange.value) >= 4) {
+        drawGrid();
+      }
+    }
+
+    function drawGrid() {
+      lcdCtx.save();
+      lcdCtx.globalAlpha = .23;
+      lcdCtx.strokeStyle = '#000';
+      lcdCtx.lineWidth = .35;
+      for (let x = 1; x < lcd.w; x++) {
+        lcdCtx.beginPath();
+        lcdCtx.moveTo(x, 0);
+        lcdCtx.lineTo(x, lcd.h);
+        lcdCtx.stroke();
+      }
+      for (let y = 1; y < lcd.h; y++) {
+        lcdCtx.beginPath();
+        lcdCtx.moveTo(0, y);
+        lcdCtx.lineTo(lcd.w, y);
+        lcdCtx.stroke();
+      }
+      lcdCtx.restore();
+    }
+
+    function loop(now) {
+      drawSourcePreview();
+      syncSelectionFromCrop();
+      if (els.liveToggle.checked || sourceType === 'image') {
+        renderLcd();
+      }
+      frameCount += 1;
+      if (now - lastFpsAt > 650) {
+        const fps = Math.round(frameCount * 1000 / (now - lastFpsAt));
+        els.lcdStatus.textContent = `${fps} fps`;
+        frameCount = 0;
+        lastFpsAt = now;
+      }
+      requestAnimationFrame(loop);
+    }
+
+    async function startScreen() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        els.sourceStatus.textContent = 'このブラウザは画面共有APIに未対応です';
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: { frameRate: { ideal: 30 }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: false
+        });
+        els.sourceVideo.srcObject = stream;
+        await els.sourceVideo.play();
+        source = els.sourceVideo;
+        sourceType = 'screen';
+        initCropToCenter();
+        updateSourceStatus('画面共有');
+        stream.getVideoTracks()[0].addEventListener('ended', () => {
+          els.sourceStatus.textContent = '画面共有は停止しました';
+        });
+      } catch (error) {
+        els.sourceStatus.textContent = '画面共有がキャンセルされました';
+      }
+    }
+
+    function loadFile(file) {
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      if (file.type.startsWith('video/')) {
+        const video = document.createElement('video');
+        video.src = url;
+        video.loop = true;
+        video.muted = true;
+        video.playsInline = true;
+        video.addEventListener('loadedmetadata', async () => {
+          await video.play();
+          source = video;
+          sourceType = 'video';
+          initCropToCenter();
+          updateSourceStatus(file.name);
+        }, { once: true });
+      } else {
+        const img = new Image();
+        img.onload = () => {
+          source = img;
+          sourceType = 'image';
+          initCropToCenter();
+          updateSourceStatus(file.name);
+          URL.revokeObjectURL(url);
+        };
+        img.src = url;
+      }
+    }
+
+    function updateSourceStatus(label) {
+      const size = getSourceSize();
+      els.sourceStatus.textContent = label;
+      els.inputSize.textContent = size.w && size.h ? `${size.w} x ${size.h}` : '-';
+      els.dropHint.style.display = source ? 'none' : 'block';
+    }
+
+    function pointerToCanvas(event) {
+      const rect = els.sourceCanvas.getBoundingClientRect();
+      return {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top
+      };
+    }
+
+    function moveSelection(left, top, width, height) {
+      const minW = 16 * sourceRect.scale;
+      const aspect = getAspect();
+      const minH = minW / aspect;
+      width = Math.max(minW, width);
+      height = Math.max(minH, width / aspect);
+      if (height > sourceRect.h) {
+        height = sourceRect.h;
+        width = height * aspect;
+      }
+      if (width > sourceRect.w) {
+        width = sourceRect.w;
+        height = width / aspect;
+      }
+      left = clamp(left, sourceRect.x, sourceRect.x + sourceRect.w - width);
+      top = clamp(top, sourceRect.y, sourceRect.y + sourceRect.h - height);
+      els.selection.style.left = `${left}px`;
+      els.selection.style.top = `${top}px`;
+      els.selection.style.width = `${width}px`;
+      els.selection.style.height = `${height}px`;
+      syncCropFromSelection();
+    }
+
+    els.selection.addEventListener('pointerdown', (event) => {
+      if (!source) return;
+      const handle = event.target.dataset.handle || null;
+      const p = pointerToCanvas(event);
+      drag = {
+        handle,
+        startX: p.x,
+        startY: p.y,
+        left: parseFloat(els.selection.style.left || 0),
+        top: parseFloat(els.selection.style.top || 0),
+        width: parseFloat(els.selection.style.width || 0),
+        height: parseFloat(els.selection.style.height || 0)
+      };
+      els.selection.setPointerCapture(event.pointerId);
+    });
+
+    els.selection.addEventListener('pointermove', (event) => {
+      if (!drag) return;
+      const p = pointerToCanvas(event);
+      const dx = p.x - drag.startX;
+      const dy = p.y - drag.startY;
+
+      if (!drag.handle) {
+        moveSelection(drag.left + dx, drag.top + dy, drag.width, drag.height);
+        return;
+      }
+
+      const sign = drag.handle.includes('w') ? -1 : 1;
+      let width = drag.width + dx * sign;
+      let height = width / getAspect();
+      let left = drag.left;
+      let top = drag.top;
+
+      if (drag.handle.includes('w')) left = drag.left + drag.width - width;
+      if (drag.handle.includes('n')) top = drag.top + drag.height - height;
+      moveSelection(left, top, width, height);
+    });
+
+    els.selection.addEventListener('pointerup', () => {
+      drag = null;
+    });
+
+    [els.cropX, els.cropY, els.cropW, els.cropH].forEach((input) => {
+      input.addEventListener('change', () => {
+        crop.x = Number(els.cropX.value) || 0;
+        crop.y = Number(els.cropY.value) || 0;
+        crop.w = Number(els.cropW.value) || lcd.w;
+        crop.h = Math.round(crop.w / getAspect());
+        normalizeCrop();
+      });
+    });
+
+    [els.lcdW, els.lcdH].forEach((input) => {
+      input.addEventListener('change', applyLcdSize);
+    });
+
+    [els.zoomRange, els.pixelAspect, els.gridToggle, els.fitMode, els.colorMode, els.ditherMode, els.brightness, els.contrast, els.saturation, els.gamma].forEach((el) => {
+      el.addEventListener('input', () => {
+        updateOutputs();
+        renderLcd();
+      });
+    });
+
+    els.fileInput.addEventListener('change', () => loadFile(els.fileInput.files[0]));
+    els.screenButton.addEventListener('click', startScreen);
+
+    els.sourceWrap.addEventListener('dragover', (event) => {
+      event.preventDefault();
+    });
+
+    els.sourceWrap.addEventListener('drop', (event) => {
+      event.preventDefault();
+      loadFile(event.dataTransfer.files[0]);
+    });
+
+    els.downloadPng.addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.download = `lcd-${lcd.w}x${lcd.h}.png`;
+      link.href = els.lcdCanvas.toDataURL('image/png');
+      link.click();
+    });
+
+    els.copyC.addEventListener('click', async () => {
+      const image = lastFrameImage || lcdCtx.getImageData(0, 0, lcd.w, lcd.h);
+      const values = [];
+      for (let i = 0; i < image.data.length; i += 4) {
+        const r = image.data[i] >> 3;
+        const g = image.data[i + 1] >> 2;
+        const b = image.data[i + 2] >> 3;
+        const rgb565 = (r << 11) | (g << 5) | b;
+        values.push(`0x${rgb565.toString(16).padStart(4, '0')}`);
+      }
+      const lines = [];
+      for (let i = 0; i < values.length; i += 8) {
+        lines.push(`  ${values.slice(i, i + 8).join(', ')}`);
+      }
+      const text = `const uint16_t lcd_image_${lcd.w}x${lcd.h}[${lcd.w * lcd.h}] = {\n${lines.join(',\n')}\n};`;
+      await navigator.clipboard.writeText(text);
+      els.lcdStatus.textContent = 'RGB565 C配列をコピーしました';
+    });
+
+    const observer = new ResizeObserver(() => {
+      fitSourceCanvas();
+      drawSourcePreview();
+      syncSelectionFromCrop();
+      updateLcdCanvasSize();
+    });
+    observer.observe(els.sourceWrap);
+
+    updateOutputs();
+    fitSourceCanvas();
+    initCropToCenter();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
