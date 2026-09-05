@@ -195,6 +195,44 @@
       max-height: none;
     }
 
+    .lcd-wrap {
+      position: relative;
+      box-shadow: 0 0 0 1px #000, 0 12px 36px rgba(0,0,0,.45);
+    }
+
+    .preview .stage {
+      display: block;
+      overflow: auto;
+    }
+
+    .lcd-viewport {
+      min-width: 100%;
+      min-height: 100%;
+      width: max-content;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1px;
+    }
+
+    .lcd-wrap #lcdCanvas {
+      box-shadow: none;
+    }
+
+    .lcd-grid {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      display: none;
+      background-image:
+        linear-gradient(to right, rgba(0, 0, 0, .5) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 0, 0, .5) 1px, transparent 1px);
+    }
+
+    .lcd-wrap.show-grid .lcd-grid {
+      display: block;
+    }
+
     .selection {
       position: absolute;
       border: 2px solid var(--accent);
@@ -420,7 +458,12 @@
         </div>
       </header>
       <div class="stage">
-        <canvas id="lcdCanvas" width="160" height="128"></canvas>
+        <div id="lcdViewport" class="lcd-viewport">
+          <div id="lcdWrap" class="lcd-wrap">
+            <canvas id="lcdCanvas" width="160" height="128"></canvas>
+            <div id="lcdGrid" class="lcd-grid"></div>
+          </div>
+        </div>
       </div>
       <div class="status">
         <span id="lcdStatus">0 fps</span>
@@ -454,7 +497,7 @@
           <h3>表示</h3>
           <div class="field">
             <label for="zoomRange"><span>拡大率</span><output id="zoomOut">5x</output></label>
-            <input id="zoomRange" type="range" min="2" max="8" step="1" value="5">
+            <input id="zoomRange" type="range" min="1" max="8" step="1" value="5">
           </div>
           <div class="field">
             <label for="pixelAspect"><span>横ドット比</span><output id="pixelAspectOut">1.00</output></label>
@@ -493,8 +536,8 @@
           <div class="field">
             <label for="ditherMode"><span>ディザ</span></label>
             <select id="ditherMode">
-              <option value="none">なし</option>
-              <option value="bayer" selected>Bayer 4x4</option>
+              <option value="none" selected>なし</option>
+              <option value="bayer">Bayer 4x4</option>
             </select>
           </div>
         </div>
@@ -568,7 +611,10 @@
     const els = {
       sourceWrap: document.getElementById('sourceWrap'),
       sourceCanvas: document.getElementById('sourceCanvas'),
+      lcdViewport: document.getElementById('lcdViewport'),
+      lcdWrap: document.getElementById('lcdWrap'),
       lcdCanvas: document.getElementById('lcdCanvas'),
+      lcdGrid: document.getElementById('lcdGrid'),
       selection: document.getElementById('selection'),
       fileInput: document.getElementById('fileInput'),
       screenButton: document.getElementById('screenButton'),
@@ -777,18 +823,14 @@
     function updateLcdCanvasSize() {
       const zoom = Number(els.zoomRange.value);
       const pixelAspect = Number(els.pixelAspect.value) / 100;
-      const targetW = lcd.w * zoom * pixelAspect;
-      const targetH = lcd.h * zoom;
-      const displayAspect = targetW / targetH;
-      const stage = els.lcdCanvas.closest('.stage').getBoundingClientRect();
-      const pad = 24;
-      const maxW = Math.max(80, stage.width - pad);
-      const maxH = Math.max(64, stage.height - pad);
-      const scale = Math.min(1, maxW / targetW, maxH / targetH);
-      const cssW = Math.floor(targetW * scale);
-      const cssH = Math.floor(cssW / displayAspect);
+      const cssW = Math.max(1, Math.round(lcd.w * zoom * pixelAspect));
+      const cssH = Math.max(1, Math.round(lcd.h * zoom));
+      els.lcdWrap.style.width = `${cssW}px`;
+      els.lcdWrap.style.height = `${cssH}px`;
       els.lcdCanvas.style.width = `${cssW}px`;
       els.lcdCanvas.style.height = `${cssH}px`;
+      els.lcdGrid.style.backgroundSize = `${cssW / lcd.w}px ${cssH / lcd.h}px`;
+      els.lcdWrap.classList.toggle('show-grid', els.gridToggle.checked && (cssW / lcd.w) >= 4);
     }
 
     function adjustedPixel(r, g, b, x, y) {
@@ -897,30 +939,6 @@
       }
       lcdCtx.putImageData(image, 0, 0);
       lastFrameImage = image;
-
-      if (els.gridToggle.checked && Number(els.zoomRange.value) >= 4) {
-        drawGrid();
-      }
-    }
-
-    function drawGrid() {
-      lcdCtx.save();
-      lcdCtx.globalAlpha = .23;
-      lcdCtx.strokeStyle = '#000';
-      lcdCtx.lineWidth = .35;
-      for (let x = 1; x < lcd.w; x++) {
-        lcdCtx.beginPath();
-        lcdCtx.moveTo(x, 0);
-        lcdCtx.lineTo(x, lcd.h);
-        lcdCtx.stroke();
-      }
-      for (let y = 1; y < lcd.h; y++) {
-        lcdCtx.beginPath();
-        lcdCtx.moveTo(0, y);
-        lcdCtx.lineTo(lcd.w, y);
-        lcdCtx.stroke();
-      }
-      lcdCtx.restore();
     }
 
     function loop(now) {
