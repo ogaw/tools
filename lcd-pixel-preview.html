@@ -730,7 +730,6 @@
       els.selection.style.top = `${top}px`;
       els.selection.style.width = `${crop.w * sourceRect.scale}px`;
       els.selection.style.height = `${crop.h * sourceRect.scale}px`;
-      updateCropInputs();
     }
 
     function syncCropFromSelection() {
@@ -746,12 +745,21 @@
       updateCropInputs();
     }
 
-    function normalizeCrop() {
+    function normalizeCrop(dimension = 'w') {
       const size = getSourceSize();
       if (!size.w || !size.h) return;
       const aspect = getAspect();
-      crop.w = clamp(crop.w, 16, size.w);
-      crop.h = Math.round(crop.w / aspect);
+      if (dimension === 'h') {
+        crop.h = clamp(crop.h, Math.min(size.h, Math.max(1, Math.round(16 / aspect))), size.h);
+        crop.w = Math.round(crop.h * aspect);
+        if (crop.w > size.w) {
+          crop.w = size.w;
+          crop.h = Math.round(crop.w / aspect);
+        }
+      } else {
+        crop.w = clamp(crop.w, Math.min(16, size.w), size.w);
+        crop.h = Math.round(crop.w / aspect);
+      }
       if (crop.h > size.h) {
         crop.h = size.h;
         crop.w = Math.round(crop.h * aspect);
@@ -1091,13 +1099,14 @@
     });
 
     [els.cropX, els.cropY, els.cropW, els.cropH].forEach((input) => {
-      input.addEventListener('change', () => {
-        crop.x = Number(els.cropX.value) || 0;
-        crop.y = Number(els.cropY.value) || 0;
-        crop.w = Number(els.cropW.value) || lcd.w;
-        crop.h = Math.round(crop.w / getAspect());
-        normalizeCrop();
+      input.addEventListener('input', () => {
+        if (input.value === '' || !Number.isFinite(input.valueAsNumber)) return;
+        const key = input.id.slice(4).toLowerCase();
+        crop[key] = Math.round(input.valueAsNumber);
+        normalizeCrop(key === 'h' ? 'h' : 'w');
+        renderLcd();
       });
+      input.addEventListener('change', updateCropInputs);
     });
 
     [els.lcdW, els.lcdH].forEach((input) => {
