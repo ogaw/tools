@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ICON_16x16 Viewer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #111418;
+      --panel: #191f27;
+      --panel-2: #202833;
+      --line: #354152;
+      --text: #eef5ff;
+      --muted: #98a8ba;
+      --accent: #68d6ff;
+      --fg: #ffd84d;
+      --off: #1a2029;
+      --grid-line: rgba(255, 255, 255, .08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--line);
+      background: #151a21;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: 420px minmax(0, 1fr);
+      height: calc(100vh - 65px);
+      min-height: 0;
+    }
+
+    aside {
+      padding: 16px;
+      border-right: 1px solid var(--line);
+      background: var(--panel);
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    section {
+      padding: 18px;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    label {
+      display: block;
+      margin: 0 0 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    input[type="file"],
+    input[type="range"],
+    textarea,
+    select {
+      width: 100%;
+    }
+
+    textarea {
+      min-height: 420px;
+      resize: vertical;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #0f1319;
+      color: var(--text);
+      font: 12px Consolas, "Courier New", monospace;
+      line-height: 1.4;
+      height: 100%;
+    }
+
+    button {
+      min-height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel-2);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    button:hover { border-color: var(--accent); }
+
+    .controls {
+      display: grid;
+      grid-template-rows: auto auto auto auto auto minmax(420px, 1fr) auto;
+      gap: 14px;
+      height: 100%;
+      min-height: 0;
+    }
+
+
+    .source-panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .source-panel textarea {
+      flex: 1;
+    }
+    .drop {
+      padding: 14px;
+      border: 1px dashed #53657a;
+      border-radius: 6px;
+      color: var(--muted);
+      text-align: center;
+      background: #121821;
+    }
+
+    .drop.drag {
+      border-color: var(--accent);
+      color: var(--text);
+      background: #142431;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .row > * { flex: 1; }
+
+    .viewer-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .count {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .icons {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+
+    .icon {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel);
+      padding: 12px;
+      overflow-x: auto;
+    }
+
+    .icon-title {
+      margin-bottom: 10px;
+      font: 12px Consolas, "Courier New", monospace;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(16, var(--cell));
+      grid-template-rows: repeat(16, var(--cell));
+      width: calc(16 * var(--cell));
+      height: calc(16 * var(--cell));
+      background: #0a0d12;
+      border: 1px solid #5d6c7d;
+      image-rendering: pixelated;
+    }
+
+    .pixel {
+      width: var(--cell);
+      height: var(--cell);
+      border-right: 1px solid var(--grid-line);
+      border-bottom: 1px solid var(--grid-line);
+      background: var(--off);
+    }
+
+    .pixel.on { background: var(--fg); }
+
+    .meta {
+      margin-top: 9px;
+      color: var(--muted);
+      font: 12px Consolas, "Courier New", monospace;
+      line-height: 1.45;
+    }
+
+    .empty {
+      color: var(--muted);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 18px;
+      background: var(--panel);
+    }
+
+    @media (max-width: 760px) {
+      body { height: auto; overflow: auto; }
+      main { grid-template-columns: 1fr; height: auto; }
+      aside { border-right: 0; border-bottom: 1px solid var(--line); overflow: visible; }
+      .controls { height: auto; }
+      textarea { height: 360px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ICON_16x16 Viewer</h1>
+    <div class="count" id="status">ICON_16x16.h を読み込んでください</div>
+  </header>
+
+  <main>
+    <aside>
+      <div class="controls">
+        <div>
+          <label for="file">Header file</label>
+          <input id="file" type="file" accept=".h,.txt,.c">
+        </div>
+
+        <div class="drop" id="drop">ここに ICON_16x16.h をドロップ</div>
+
+        <div>
+          <label for="zoom">Zoom</label>
+          <input id="zoom" type="range" min="1" max="32" value="14">
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="fg">On</label>
+            <input id="fg" type="color" value="#ffd84d">
+          </div>
+          <div>
+            <label for="off">Off</label>
+            <input id="off" type="color" value="#1a2029">
+          </div>
+        </div>
+
+        <div>
+          <label for="filter">Filter</label>
+          <input id="filter" type="search" placeholder="SUN, MONITOR, LED...">
+        </div>
+
+        <div class="source-panel">
+          <label for="source">Source</label>
+          <textarea id="source" spellcheck="false"></textarea>
+        </div>
+
+        <button id="parse" title="Source欄を編集した後に、内容をもう一度読み込んで表示します">Sourceを再解析</button>
+      </div>
+    </aside>
+
+    <section>
+      <div class="viewer-head">
+        <div class="count" id="summary">0 icons</div>
+      </div>
+      <div class="icons" id="icons"></div>
+    </section>
+  </main>
+
+  <script>
+    const source = document.getElementById("source");
+    const icons = document.getElementById("icons");
+    const status = document.getElementById("status");
+    const summary = document.getElementById("summary");
+    const zoom = document.getElementById("zoom");
+    const fg = document.getElementById("fg");
+    const off = document.getElementById("off");
+    const filter = document.getElementById("filter");
+    let parsed = [];
+
+    function stripComments(text) {
+      return text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    }
+
+    function parseIconHeader(text) {
+      const clean = stripComments(text);
+      const result = [];
+      const re = /static\s+const\s+uint8_t\s+(ICON_[A-Za-z0-9_]+_16x16)_DATA\s*\[\s*32\s*\]\s*=\s*\{([\s\S]*?)\};/g;
+      let match;
+      while ((match = re.exec(clean)) !== null) {
+        const bytes = [];
+        const byteRe = /0x([0-9a-fA-F]{1,2})|\b(\d{1,3})\b/g;
+        let byteMatch;
+        while ((byteMatch = byteRe.exec(match[2])) !== null) {
+          const value = byteMatch[1] ? parseInt(byteMatch[1], 16) : parseInt(byteMatch[2], 10);
+          if (value >= 0 && value <= 255) bytes.push(value);
+        }
+        result.push({
+          name: match[1].replace(/_DATA$/, ""),
+          bytes,
+          valid: bytes.length === 32
+        });
+      }
+      return result;
+    }
+
+    function bitmapFromBytes(bytes) {
+      const pixels = [];
+      for (let y = 0; y < 16; y++) {
+        const lo = bytes[y * 2] || 0;
+        const hi = bytes[y * 2 + 1] || 0;
+        for (let x = 0; x < 16; x++) {
+          const b = x < 8 ? lo : hi;
+          pixels.push((b & (1 << (x & 7))) !== 0);
+        }
+      }
+      return pixels;
+    }
+
+    function metrics(pixels) {
+      let minX = 16, minY = 16, maxX = -1, maxY = -1, count = 0;
+      pixels.forEach((on, i) => {
+        if (!on) return;
+        const x = i % 16;
+        const y = Math.floor(i / 16);
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+        count++;
+      });
+      if (!count) return { text: "empty" };
+      return {
+        text: `bounds ${maxX - minX + 1}x${maxY - minY + 1} @ ${minX},${minY} / on ${count}`
+      };
+    }
+
+    function render() {
+      const needle = filter.value.trim().toLowerCase();
+      const visible = parsed.filter(icon => icon.name.toLowerCase().includes(needle));
+      const cell = Number(zoom.value);
+      document.documentElement.style.setProperty("--cell", `${cell}px`);
+      document.documentElement.style.setProperty("--grid-line", cell >= 6 ? "rgba(255, 255, 255, .08)" : "transparent");
+      document.documentElement.style.setProperty("--fg", fg.value);
+      document.documentElement.style.setProperty("--off", off.value);
+      icons.replaceChildren();
+      summary.textContent = `${visible.length} / ${parsed.length} icons`;
+
+      if (!visible.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = parsed.length ? "該当するアイコンがありません" : "まだアイコンが読み込まれていません";
+        icons.append(empty);
+        return;
+      }
+
+      for (const icon of visible) {
+        const pixels = bitmapFromBytes(icon.bytes);
+        const root = document.createElement("article");
+        root.className = "icon";
+        const title = document.createElement("div");
+        title.className = "icon-title";
+        title.textContent = icon.name;
+        const grid = document.createElement("div");
+        grid.className = "grid";
+        grid.title = "16x16, leftmost pixel is bit 0";
+        for (const on of pixels) {
+          const px = document.createElement("span");
+          px.className = on ? "pixel on" : "pixel";
+          grid.append(px);
+        }
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        meta.textContent = icon.valid ? metrics(pixels).text : `invalid: ${icon.bytes.length} bytes`;
+        root.append(title, grid, meta);
+        icons.append(root);
+      }
+    }
+
+    function parseAndRender(text) {
+      parsed = parseIconHeader(text);
+      status.textContent = parsed.length ? `${parsed.length} icons parsed` : "アイコン配列が見つかりません";
+      render();
+    }
+
+    document.getElementById("parse").addEventListener("click", () => parseAndRender(source.value));
+    [zoom, fg, off, filter].forEach(el => el.addEventListener("input", render));
+
+    document.getElementById("file").addEventListener("change", async event => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+      source.value = text;
+      parseAndRender(text);
+    });
+
+    const drop = document.getElementById("drop");
+    drop.addEventListener("dragover", event => {
+      event.preventDefault();
+      drop.classList.add("drag");
+    });
+    drop.addEventListener("dragleave", () => drop.classList.remove("drag"));
+    drop.addEventListener("drop", async event => {
+      event.preventDefault();
+      drop.classList.remove("drag");
+      const file = event.dataTransfer.files && event.dataTransfer.files[0];
+      if (!file) return;
+      const text = await file.text();
+      source.value = text;
+      parseAndRender(text);
+    });
+  </script>
+</body>
+</html>
